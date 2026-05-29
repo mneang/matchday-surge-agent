@@ -94,21 +94,42 @@ function buildAgentRun(args: {
   };
 }
 
-export async function POST() {
+export async function POST(request: Request) {
   const db = await getMongoDb();
 
+  let requestedBusinessId = "la_restaurant_001";
+
+  try {
+    const body = await request.json();
+    if (typeof body?.businessId === "string" && body.businessId.trim()) {
+      requestedBusinessId = body.businessId;
+    }
+  } catch {
+    // No JSON body provided. Use default demo profile.
+  }
+
   const businessProfile = (await db.collection("business_profiles").findOne(
-    { businessId: "la_restaurant_001" },
+    { businessId: requestedBusinessId },
     { projection: { _id: 0 } }
   )) as BusinessProfile | null;
 
+  const scenarioId =
+    typeof (businessProfile as BusinessProfile & { scenarioId?: string })?.scenarioId === "string"
+      ? (businessProfile as BusinessProfile & { scenarioId: string }).scenarioId
+      : "wc2026_restaurant_rush";
+
+  const templateId =
+    typeof (businessProfile as BusinessProfile & { templateId?: string })?.templateId === "string"
+      ? (businessProfile as BusinessProfile & { templateId: string }).templateId
+      : "restaurant_surge_template";
+
   const matchdayScenario = (await db.collection("matchday_scenarios").findOne(
-    { scenarioId: "wc2026_la_evening_match" },
+    { scenarioId },
     { projection: { _id: 0 } }
   )) as MatchdayScenario | null;
 
   const readinessTemplate = (await db.collection("readiness_templates").findOne(
-    { templateId: "restaurant_surge_template" },
+    { templateId },
     { projection: { _id: 0 } }
   )) as ReadinessTemplate | null;
 

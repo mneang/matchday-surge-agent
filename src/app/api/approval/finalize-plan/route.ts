@@ -31,13 +31,40 @@ function buildFinalBrief(plan: GeneratedPlanDocument) {
   };
 }
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
     const db = await getMongoDb();
 
+    let requestedPlanId: string | null = null;
+    let requestedBusinessId: string | null = null;
+
+    try {
+      const body = await request.json();
+      requestedPlanId =
+        typeof body?.planId === "string" && body.planId.trim()
+          ? body.planId
+          : null;
+      requestedBusinessId =
+        typeof body?.businessId === "string" && body.businessId.trim()
+          ? body.businessId
+          : null;
+    } catch {
+      // No JSON body provided. Approve latest pending plan.
+    }
+
+    const planFilter: Record<string, string> = {
+      status: "pending_owner_approval",
+    };
+
+    if (requestedPlanId) {
+      planFilter.planId = requestedPlanId;
+    } else if (requestedBusinessId) {
+      planFilter.businessId = requestedBusinessId;
+    }
+
     const latestPlan = (await db
       .collection("generated_plans")
-      .find({ status: "pending_owner_approval" })
+      .find(planFilter)
       .sort({ createdAt: -1 })
       .limit(1)
       .next()) as GeneratedPlanDocument | null;

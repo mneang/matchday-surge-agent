@@ -77,6 +77,42 @@ type GeneratePlanResponse = {
   error?: string;
 };
 
+type ScenarioProfile = {
+  businessId: string;
+  label: string;
+  name: string;
+  area: string;
+  pressure: string;
+  tone: "green" | "yellow" | "blue";
+};
+
+const scenarioProfiles: ScenarioProfile[] = [
+  {
+    businessId: "la_restaurant_001",
+    label: "Restaurant Rush",
+    name: "Harbor Grill LA",
+    area: "Inglewood stadium district",
+    pressure: "dining + takeout",
+    tone: "green",
+  },
+  {
+    businessId: "la_market_001",
+    label: "Market Stockout",
+    name: "Pico Market",
+    area: "matchday walking corridor",
+    pressure: "drinks + checkout",
+    tone: "yellow",
+  },
+  {
+    businessId: "la_parking_001",
+    label: "Parking Flow",
+    name: "Metro Lot Crew",
+    area: "stadium approach zone",
+    pressure: "lanes + pedestrians",
+    tone: "blue",
+  },
+];
+
 type ApprovalResponse = {
   ok: boolean;
   source: string;
@@ -330,12 +366,16 @@ export default function Home() {
   const [isApproving, setIsApproving] = useState(false);
   const [showProof, setShowProof] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [selectedBusinessId, setSelectedBusinessId] = useState("la_restaurant_001");
   const [error, setError] = useState<string | null>(null);
 
   const business = planResult?.businessProfile;
   const scenario = planResult?.matchdayScenario;
   const plan = planResult?.matchdayPlan;
   const finalBrief = approvalResult?.finalBrief;
+  const selectedScenario =
+    scenarioProfiles.find((item) => item.businessId === selectedBusinessId) ??
+    scenarioProfiles[0];
 
   const stage: "start" | "review" | "approved" = finalBrief
     ? "approved"
@@ -380,6 +420,12 @@ export default function Home() {
     try {
       const response = await fetch("/api/agent/generate-plan", {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          businessId: selectedBusinessId,
+        }),
       });
 
       const data = (await response.json()) as GeneratePlanResponse;
@@ -403,6 +449,13 @@ export default function Home() {
     try {
       const response = await fetch("/api/approval/finalize-plan", {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          businessId: selectedBusinessId,
+          planId: planResult?.generatedPlan.planId,
+        }),
       });
 
       const data = (await response.json()) as ApprovalResponse;
@@ -510,23 +563,65 @@ export default function Home() {
 
               <StepRail stage={stage} />
 
+              <div className="rounded-[1.75rem] border border-white/10 bg-black/20 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.24em] text-slate-500">
+                      Choose profile
+                    </p>
+                    <p className="mt-1 text-lg font-black text-white">
+                      MongoDB-backed scenario selector
+                    </p>
+                  </div>
+                  <StatusChip tone={selectedScenario.tone}>{selectedScenario.label}</StatusChip>
+                </div>
+
+                <div className="mt-4 grid gap-2 md:grid-cols-3">
+                  {scenarioProfiles.map((profile) => {
+                    const isSelected = profile.businessId === selectedBusinessId;
+                    return (
+                      <button
+                        key={profile.businessId}
+                        onClick={() => {
+                          setSelectedBusinessId(profile.businessId);
+                          setPlanResult(null);
+                          setApprovalResult(null);
+                          setShowDetails(false);
+                          setShowProof(false);
+                          setError(null);
+                        }}
+                        disabled={Boolean(plan)}
+                        className={`rounded-2xl border px-4 py-3 text-left transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                          isSelected
+                            ? "border-emerald-300/40 bg-emerald-300/10"
+                            : "border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
+                        }`}
+                      >
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
+                          {profile.label}
+                        </p>
+                        <p className="mt-1 text-sm font-black text-white">
+                          {profile.name}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div className="grid gap-3 rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-4 md:grid-cols-3">
                 <ProofMini
                   label="Business"
-                  value={business?.name ?? "Harbor Grill LA"}
+                  value={business?.name ?? selectedScenario.name}
                   tone="green"
                 />
                 <ProofMini
                   label="Area"
-                  value={business?.area ?? "Inglewood district"}
+                  value={business?.area ?? selectedScenario.area}
                 />
                 <ProofMini
                   label="Pressure"
-                  value={
-                    scenario?.expectedPattern
-                      ? "pre-match + post-match"
-                      : "pre-match + post-match"
-                  }
+                  value={scenario?.expectedPattern ?? selectedScenario.pressure}
                   tone="yellow"
                 />
               </div>

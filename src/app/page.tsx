@@ -1,65 +1,881 @@
-import Image from "next/image";
+"use client";
+
+import { useMemo, useState } from "react";
+import { motion } from "motion/react";
+
+type BusinessProfile = {
+  businessId: string;
+  name: string;
+  city: string;
+  area: string;
+  businessType: string;
+  normalStaff: number;
+  maxStaff: number;
+  normalCapacity: number;
+  peakCapacity: number;
+  languages: string[];
+  constraints: string[];
+  priorityItems: string[];
+  ownerGoal: string;
+};
+
+type MatchdayScenario = {
+  scenarioId: string;
+  eventName: string;
+  hostCity: string;
+  venueArea: string;
+  kickoffWindow: string;
+  expectedPattern: string;
+  recommendedPrepWindow: string;
+  riskFactors: string[];
+  localContext: string;
+};
+
+type MatchdayPlan = {
+  summary: string;
+  staffing: string[];
+  inventory: string[];
+  serviceFlow: string[];
+  customerMessages: {
+    english: string;
+    spanish: string;
+    french: string;
+  };
+  riskNotes: string[];
+  ownerChecklist: string[];
+  approvalRequired: boolean;
+};
+
+type AgentRun = {
+  decision: {
+    surgeRisk: "low" | "medium" | "high";
+    likelyPressurePoint: string;
+    decisionSummary: string;
+    confidence: "low" | "medium" | "medium-high" | "high";
+    recommendedOwnerAction: string;
+    approvalRequired: boolean;
+  };
+};
+
+type GeneratePlanResponse = {
+  ok: boolean;
+  mode: "gemini_live" | "deterministic_fallback";
+  source: {
+    database: string;
+    ai: string;
+  };
+  businessProfile: BusinessProfile;
+  matchdayScenario: MatchdayScenario;
+  matchdayPlan: MatchdayPlan;
+  agentRun: AgentRun;
+  generatedPlan: {
+    planId: string;
+    status: string;
+    createdAt: string;
+  };
+  approvalRequired: boolean;
+  error?: string;
+};
+
+type ApprovalResponse = {
+  ok: boolean;
+  source: string;
+  approvalEvent: {
+    approvalId: string;
+    planId: string;
+    approvedBy: string;
+    status: string;
+    approvedAt: string;
+  };
+  finalBrief: {
+    title: string;
+    planId: string;
+    status: string;
+    summary: string;
+    sections: {
+      staffing: string[];
+      inventory: string[];
+      serviceFlow: string[];
+      customerMessages: {
+        english: string;
+        spanish: string;
+        french: string;
+      };
+      riskNotes: string[];
+      ownerChecklist: string[];
+    };
+    approvalNote: string;
+  };
+  error?: string;
+};
+
+function cleanText(value: string) {
+  return value
+    .replaceAll("**", "")
+    .replaceAll("`", "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function firstSentence(items: string[] | undefined, fallback: string) {
+  if (!items || items.length === 0) return fallback;
+  const text = cleanText(items[0]);
+  return text.split(/(?<=[.!?])\s+/)[0];
+}
+
+function shortPhrase(value: string, max = 96) {
+  const text = cleanText(value);
+  return text.length > max ? `${text.slice(0, max).trim()}…` : text;
+}
+
+function StatusChip({
+  children,
+  tone = "neutral",
+}: {
+  children: React.ReactNode;
+  tone?: "neutral" | "green" | "yellow" | "blue" | "purple";
+}) {
+  const styles = {
+    green: "border-emerald-300/35 bg-emerald-300/10 text-emerald-100",
+    yellow: "border-yellow-300/35 bg-yellow-300/10 text-yellow-100",
+    blue: "border-sky-300/35 bg-sky-300/10 text-sky-100",
+    purple: "border-fuchsia-300/35 bg-fuchsia-300/10 text-fuchsia-100",
+    neutral: "border-white/15 bg-white/[0.06] text-slate-200",
+  };
+
+  return (
+    <span
+      className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${styles[tone]}`}
+    >
+      {children}
+    </span>
+  );
+}
+
+function StepRail({
+  stage,
+}: {
+  stage: "start" | "review" | "approved";
+}) {
+  const steps = [
+    {
+      number: "1",
+      label: "Prepare",
+      status:
+        stage === "start"
+          ? "Start here"
+          : stage === "review"
+          ? "Done"
+          : "Done",
+      active: stage === "start",
+      done: stage !== "start",
+    },
+    {
+      number: "2",
+      label: "Review",
+      status:
+        stage === "start"
+          ? "Locked"
+          : stage === "review"
+          ? "Now"
+          : "Done",
+      active: stage === "review",
+      done: stage === "approved",
+    },
+    {
+      number: "3",
+      label: "Approve",
+      status:
+        stage === "approved"
+          ? "Done"
+          : stage === "review"
+          ? "Ready"
+          : "Locked",
+      active: stage === "approved",
+      done: stage === "approved",
+    },
+  ];
+
+  return (
+    <div className="grid gap-3 md:grid-cols-3">
+      {steps.map((step) => (
+        <div
+          key={step.number}
+          className={`rounded-full border px-4 py-3 ${
+            step.done
+              ? "border-emerald-300/35 bg-emerald-300/10"
+              : step.active
+              ? "border-yellow-300/40 bg-yellow-300/10"
+              : "border-white/10 bg-white/[0.04]"
+          }`}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span
+                className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-black ${
+                  step.done || step.active
+                    ? "bg-white text-slate-950"
+                    : "bg-white/10 text-slate-400"
+                }`}
+              >
+                {step.number}
+              </span>
+              <span className="text-sm font-black uppercase tracking-[0.16em] text-white">
+                {step.label}
+              </span>
+            </div>
+            <span className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+              {step.status}
+            </span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PlayCard({
+  label,
+  title,
+  detail,
+  icon,
+  tone,
+}: {
+  label: string;
+  title: string;
+  detail: string;
+  icon: string;
+  tone: "green" | "yellow" | "blue" | "purple";
+}) {
+  const styles = {
+    green: "border-emerald-300/25 bg-emerald-300/10",
+    yellow: "border-yellow-300/25 bg-yellow-300/10",
+    blue: "border-sky-300/25 bg-sky-300/10",
+    purple: "border-fuchsia-300/25 bg-fuchsia-300/10",
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -3 }}
+      transition={{ duration: 0.22 }}
+      className={`rounded-[1.75rem] border p-5 ${styles[tone]}`}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-400">
+            {label}
+          </p>
+          <h3 className="mt-3 text-2xl font-black leading-tight text-white">
+            {title}
+          </h3>
+        </div>
+        <div className="text-4xl">{icon}</div>
+      </div>
+      <p className="mt-4 text-sm font-semibold leading-6 text-slate-300">
+        {detail}
+      </p>
+    </motion.div>
+  );
+}
+
+function ProofMini({
+  label,
+  value,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  tone?: "neutral" | "green" | "yellow" | "blue" | "purple";
+}) {
+  const styles = {
+    green: "border-emerald-300/20 bg-emerald-300/10",
+    yellow: "border-yellow-300/20 bg-yellow-300/10",
+    blue: "border-sky-300/20 bg-sky-300/10",
+    purple: "border-fuchsia-300/20 bg-fuchsia-300/10",
+    neutral: "border-white/10 bg-white/[0.04]",
+  };
+
+  return (
+    <div className={`rounded-2xl border p-4 ${styles[tone]}`}>
+      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">
+        {label}
+      </p>
+      <p className="mt-2 text-sm font-black leading-5 text-white">{value}</p>
+    </div>
+  );
+}
+
+function LanguageCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "green" | "yellow" | "blue";
+}) {
+  return <ProofMini label={label} value={value} tone={tone} />;
+}
 
 export default function Home() {
+  const [planResult, setPlanResult] = useState<GeneratePlanResponse | null>(
+    null
+  );
+  const [approvalResult, setApprovalResult] = useState<ApprovalResponse | null>(
+    null
+  );
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
+  const [showProof, setShowProof] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const business = planResult?.businessProfile;
+  const scenario = planResult?.matchdayScenario;
+  const plan = planResult?.matchdayPlan;
+  const finalBrief = approvalResult?.finalBrief;
+
+  const stage: "start" | "review" | "approved" = finalBrief
+    ? "approved"
+    : plan
+    ? "review"
+    : "start";
+
+  const plays = useMemo(() => {
+    return {
+      staff: plan
+        ? "Run max coverage with clear kitchen, register, pickup, and floor roles."
+        : "Assign kitchen, register, pickup, and floor roles before the rush.",
+      stock: plan
+        ? "Prioritize water, soft drinks, grab-and-go meals, tacos, and rice bowls."
+        : "Identify fast-moving food and drink items for the matchday window.",
+      flow: plan
+        ? "Use a simplified menu with clear dine-in and pickup lanes."
+        : "Prepare a simple order flow before crowds arrive.",
+      message: plan
+        ? "English, Spanish, and French customer messages are ready."
+        : "Prepare short customer messages in English, Spanish, and French.",
+      checklist: firstSentence(
+        plan?.ownerChecklist,
+        "Confirm staffing, stock, signage, service flow, and customer messages."
+      ),
+    };
+  }, [plan]);
+
+  const topStatus =
+    stage === "approved"
+      ? "Approved output ready."
+      : stage === "review"
+      ? "Review the plays, then approve."
+      : "Start by preparing the plan.";
+
+  async function generatePlan() {
+    setIsGenerating(true);
+    setApprovalResult(null);
+    setError(null);
+    setShowDetails(false);
+
+    try {
+      const response = await fetch("/api/agent/generate-plan", {
+        method: "POST",
+      });
+
+      const data = (await response.json()) as GeneratePlanResponse;
+
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || "Failed to generate matchday surge plan.");
+      }
+
+      setPlanResult(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error.");
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
+  async function approvePlan() {
+    setIsApproving(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/approval/finalize-plan", {
+        method: "POST",
+      });
+
+      const data = (await response.json()) as ApprovalResponse;
+
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || "Failed to approve matchday surge brief.");
+      }
+
+      setApprovalResult(data);
+      setShowDetails(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error.");
+    } finally {
+      setIsApproving(false);
+    }
+  }
+
+  function resetRun() {
+    setPlanResult(null);
+    setApprovalResult(null);
+    setError(null);
+    setShowProof(false);
+    setShowDetails(false);
+  }
+
+  function toggleReviewDetails() {
+    if (!plan) return;
+
+    setShowDetails((current) => {
+      const next = !current;
+
+      if (next) {
+        window.setTimeout(() => {
+          document
+            .getElementById("review-details")
+            ?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 80);
+      }
+
+      return next;
+    });
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <main className="min-h-screen overflow-x-hidden bg-[#030712] text-white">
+      <div className="pointer-events-none fixed inset-0 opacity-45">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_15%,#16a34a_0,transparent_27%),radial-gradient(circle_at_85%_20%,#facc15_0,transparent_18%),radial-gradient(circle_at_50%_95%,#0284c7_0,transparent_20%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:76px_76px]" />
+      </div>
+
+      <div className="relative mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 md:px-6">
+        <section className="overflow-hidden rounded-[2rem] border border-white/10 bg-[#060a14]/95 shadow-2xl shadow-black/50">
+          <div className="grid lg:grid-cols-[0.75fr_1.25fr]">
+            <div className="relative flex min-h-[460px] flex-col justify-between bg-[radial-gradient(circle_at_top_left,#16a34a_0,#052e16_34%,#020617_78%)] p-6 md:p-8">
+              <div className="flex flex-wrap gap-2">
+                <StatusChip tone="green">MongoDB</StatusChip>
+                <StatusChip tone="green">Gemini</StatusChip>
+                <StatusChip tone="yellow">Owner approval</StatusChip>
+              </div>
+
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.34em] text-emerald-200">
+                  Matchday Surge Agent
+                </p>
+                <h1 className="mt-4 text-6xl font-black leading-[0.86] tracking-tight md:text-8xl">
+                  Rush ready.
+                </h1>
+                <p className="mt-6 max-w-xl text-lg font-semibold leading-8 text-slate-200">
+                  One matchday operating plan for staff, stock, service flow,
+                  and customer messages.
+                </p>
+              </div>
+
+              <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-100/70">
+                Prepare · Stock · Approve · Ready
+              </p>
+            </div>
+
+            <div className="grid gap-5 bg-[linear-gradient(135deg,#111827_0%,#020617_55%,#1c1400_100%)] p-6 md:p-8">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.34em] text-yellow-200">
+                    Operator flow
+                  </p>
+                  <h2 className="mt-3 text-4xl font-black">
+                    1 Prepare → 2 Review → 3 Approve
+                  </h2>
+                </div>
+                <StatusChip
+                  tone={
+                    stage === "approved"
+                      ? "green"
+                      : stage === "review"
+                      ? "yellow"
+                      : "blue"
+                  }
+                >
+                  {stage === "approved"
+                    ? "Complete"
+                    : stage === "review"
+                    ? "Approval gate"
+                    : "Start run"}
+                </StatusChip>
+              </div>
+
+              <StepRail stage={stage} />
+
+              <div className="grid gap-3 rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-4 md:grid-cols-3">
+                <ProofMini
+                  label="Business"
+                  value={business?.name ?? "Harbor Grill LA"}
+                  tone="green"
+                />
+                <ProofMini
+                  label="Area"
+                  value={business?.area ?? "Inglewood district"}
+                />
+                <ProofMini
+                  label="Pressure"
+                  value={
+                    scenario?.expectedPattern
+                      ? "pre-match + post-match"
+                      : "pre-match + post-match"
+                  }
+                  tone="yellow"
+                />
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+                <motion.button
+                  whileHover={{ scale: plan || isGenerating ? 1 : 1.02 }}
+                  whileTap={{ scale: plan || isGenerating ? 1 : 0.98 }}
+                  onClick={generatePlan}
+                  disabled={Boolean(plan) || isGenerating}
+                  className="rounded-2xl bg-emerald-400 px-5 py-5 text-sm font-black uppercase tracking-[0.16em] text-slate-950 shadow-lg shadow-emerald-950/50 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-35"
+                >
+                  {isGenerating
+                    ? "Preparing..."
+                    : plan
+                    ? "Prepared"
+                    : "Prepare plan"}
+                </motion.button>
+
+                <button
+                  onClick={toggleReviewDetails}
+                  disabled={!plan}
+                  className="rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-5 text-sm font-black uppercase tracking-[0.16em] text-slate-200 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                  {showDetails ? "Hide full plan" : "Review plan"}
+                </button>
+
+                <motion.button
+                  whileHover={{ scale: !plan || Boolean(finalBrief) || isApproving ? 1 : 1.02 }}
+                  whileTap={{ scale: !plan || Boolean(finalBrief) || isApproving ? 1 : 0.98 }}
+                  onClick={approvePlan}
+                  disabled={!plan || Boolean(finalBrief) || isApproving}
+                  className="rounded-2xl bg-yellow-300 px-5 py-5 text-sm font-black uppercase tracking-[0.16em] text-slate-950 shadow-lg shadow-yellow-950/50 transition hover:bg-yellow-200 disabled:cursor-not-allowed disabled:opacity-35"
+                >
+                  {isApproving
+                    ? "Approving..."
+                    : finalBrief
+                    ? "Approved"
+                    : "Approve brief"}
+                </motion.button>
+              </div>
+
+              <div className="rounded-[1.75rem] border border-white/10 bg-black/20 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-500">
+                      Current status
+                    </p>
+                    <p className="mt-2 text-2xl font-black text-white">
+                      {topStatus}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <StatusChip
+                      tone={
+                        stage === "approved"
+                          ? "green"
+                          : stage === "review"
+                          ? "yellow"
+                          : "blue"
+                      }
+                    >
+                      {stage === "start"
+                        ? "Waiting to run"
+                        : stage === "review"
+                        ? "Owner approval needed"
+                        : "Ready for staff"}
+                    </StatusChip>
+                    <button
+                      onClick={resetRun}
+                      disabled={!plan && !finalBrief}
+                      className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-slate-300 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-30"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {plan ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.28 }}
+                  className={`rounded-[1.75rem] border p-4 ${
+                    finalBrief
+                      ? "border-emerald-300/30 bg-emerald-300/10"
+                      : "border-yellow-300/30 bg-yellow-300/10"
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-200">
+                        {finalBrief ? "Approved output" : "Review required"}
+                      </p>
+                      <h3 className="mt-2 text-2xl font-black">
+                        {finalBrief
+                          ? "Staff briefing is ready."
+                          : "Plan generated. Review it before approval."}
+                      </h3>
+                    </div>
+                    <StatusChip tone={finalBrief ? "green" : "yellow"}>
+                      {finalBrief ? "Final brief" : "Owner approval gate"}
+                    </StatusChip>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 md:grid-cols-3">
+                    <ProofMini
+                      label="Staff"
+                      value={finalBrief ? "Roles ready" : "Review roles"}
+                      tone="green"
+                    />
+                    <ProofMini
+                      label="Stock"
+                      value={finalBrief ? "Fast movers ready" : "Review stock"}
+                      tone="yellow"
+                    />
+                    <ProofMini
+                      label="Messages"
+                      value={finalBrief ? "EN / ES / FR ready" : "Review EN / ES / FR"}
+                      tone="purple"
+                    />
+                  </div>
+                </motion.div>
+              ) : null}
+            </div>
+          </div>
+        </section>
+
+        {error ? (
+          <section className="rounded-2xl border border-rose-400/30 bg-rose-950/60 p-4 text-sm font-semibold text-rose-100">
+            {error}
+          </section>
+        ) : null}
+
+        <section className="grid gap-4 lg:grid-cols-[0.62fr_1.38fr]">
+          <aside className="rounded-[2rem] border border-white/10 bg-[#070b17]/95 p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.3em] text-yellow-200">
+                  Situation
+                </p>
+                <h2 className="mt-2 text-3xl font-black leading-tight">
+                  Crowd surge risk
+                </h2>
+              </div>
+              <StatusChip tone="yellow">High</StatusChip>
+            </div>
+
+            <p className="mt-4 text-sm font-semibold leading-7 text-slate-300">
+              Quick meals, pickup demand, limited parking, multilingual
+              visitors, and staff pressure near a matchday corridor.
+            </p>
+
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              {[
+                "queues",
+                "stockouts",
+                "staff load",
+                "visitors",
+                "parking",
+                "takeout",
+              ].map((risk) => (
+                <span
+                  key={risk}
+                  className="rounded-full border border-yellow-300/25 bg-yellow-300/10 px-3 py-2 text-center text-xs font-black uppercase tracking-[0.12em] text-yellow-100"
+                >
+                  {risk}
+                </span>
+              ))}
+            </div>
+
+            <div className="mt-5 rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
+              <p className="text-[11px] font-black uppercase tracking-[0.24em] text-slate-500">
+                Safe scope
+              </p>
+              <p className="mt-2 text-sm font-semibold leading-6 text-slate-300">
+                No official logos, no exact crowd claims, no auto-published
+                messages.
+              </p>
+            </div>
+          </aside>
+
+          <section className="rounded-[2rem] border border-white/10 bg-[#070b17]/95 p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.3em] text-emerald-300">
+                  Matchday plays
+                </p>
+                <h2 className="mt-2 text-3xl font-black">
+                  {plan
+                    ? "Run these before crowds arrive."
+                    : "Prepare the plan to unlock the plays."}
+                </h2>
+              </div>
+              <StatusChip tone={plan ? "green" : "neutral"}>
+                {plan ? "Ready" : "Waiting"}
+              </StatusChip>
+            </div>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <PlayCard
+                label="Staff"
+                title={plan ? "Max coverage" : "Assign roles"}
+                detail={plays.staff}
+                icon="👥"
+                tone="green"
+              />
+              <PlayCard
+                label="Stock"
+                title={plan ? "Stock fast movers" : "Prepare stock"}
+                detail={plays.stock}
+                icon="🥤"
+                tone="yellow"
+              />
+              <PlayCard
+                label="Flow"
+                title={plan ? "Clear lanes" : "Simplify flow"}
+                detail={plays.flow}
+                icon="➡️"
+                tone="blue"
+              />
+              <PlayCard
+                label="Message"
+                title={plan ? "Messages ready" : "Prep messages"}
+                detail={plays.message}
+                icon="💬"
+                tone="purple"
+              />
+            </div>
+
+            {showDetails && plan ? (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25 }}
+                id="review-details"
+                className="scroll-mt-6 mt-5 rounded-[1.75rem] border border-white/10 bg-black/20 p-5"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.26em] text-emerald-300">
+                      Review details
+                    </p>
+                    <h3 className="mt-2 text-2xl font-black">
+                      What to do next + customer messages
+                    </h3>
+                  </div>
+                  <StatusChip tone="green">Gemini result</StatusChip>
+                </div>
+
+                <div className="mt-4 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                    <p className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-500">
+                      Next 3 owner actions
+                    </p>
+                    <ol className="mt-3 space-y-3 text-sm font-semibold leading-6 text-slate-300">
+                      {plan.ownerChecklist.slice(0, 3).map((item, index) => (
+                        <li key={item}>
+                          <span className="font-black text-emerald-200">
+                            {index + 1}.
+                          </span>{" "}
+                          {cleanText(item)}
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+
+                  <div className="grid gap-3">
+                    <LanguageCard
+                      label="English message"
+                      value={cleanText(plan.customerMessages.english)}
+                      tone="blue"
+                    />
+                    <LanguageCard
+                      label="Spanish message"
+                      value={cleanText(plan.customerMessages.spanish)}
+                      tone="yellow"
+                    />
+                    <LanguageCard
+                      label="French message"
+                      value={cleanText(plan.customerMessages.french)}
+                      tone="green"
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            ) : null}
+          </section>
+        </section>
+
+        <section className="rounded-[2rem] border border-white/10 bg-[#070b17]/95 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.3em] text-sky-300">
+                Proof
+              </p>
+              <h2 className="mt-2 text-2xl font-black">
+                MongoDB memory → Gemini plan → owner approval.
+              </h2>
+            </div>
+            <button
+              onClick={() => setShowProof((value) => !value)}
+              className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-slate-300 transition hover:bg-white/[0.08]"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+              {showProof ? "Hide proof" : "Show proof"}
+            </button>
+          </div>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-4">
+            <ProofMini label="MongoDB" value="Profile + scenario + template" tone="green" />
+            <ProofMini
+              label="Gemini"
+              value={planResult?.mode === "gemini_live" ? "Live planning" : "Ready"}
+              tone="blue"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+            <ProofMini label="Guardrails" value="No auto-publish / no exact crowd claims" />
+            <ProofMini
+              label="Owner"
+              value={
+                finalBrief
+                  ? "Approval event saved"
+                  : plan
+                  ? "Owner approval needed"
+                  : "Waiting"
+              }
+              tone={finalBrief ? "green" : "yellow"}
+            />
+          </div>
+
+          {showProof ? (
+            <div className="mt-4 grid gap-3 lg:grid-cols-3">
+              <ProofMini
+                label="Decision"
+                value={
+                  planResult?.agentRun.decision.decisionSummary ??
+                  "The agent recommends an operating posture after reviewing the scenario."
+                }
+                tone="blue"
+              />
+              <ProofMini label="Checklist" value={shortPhrase(plays.checklist)} tone="yellow" />
+              <ProofMini
+                label="Plan ID"
+                value={planResult?.generatedPlan.planId ?? "not generated yet"}
+              />
+            </div>
+          ) : null}
+        </section>
+      </div>
+    </main>
   );
 }

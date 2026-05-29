@@ -383,6 +383,8 @@ export default function Home() {
     ? "review"
     : "start";
 
+  const isRunLocked = Boolean(plan) || isGenerating || isApproving;
+
   const plays = useMemo(() => {
     return {
       staff: plan
@@ -538,10 +540,10 @@ export default function Home() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.34em] text-yellow-200">
-                    Operator flow
+                    Matchday command board
                   </p>
-                  <h2 className="mt-3 text-4xl font-black">
-                    1 Prepare → 2 Review → 3 Approve
+                  <h2 className="mt-3 text-3xl font-black md:text-4xl">
+                    Choose. Prepare. Approve.
                   </h2>
                 </div>
                 <StatusChip
@@ -556,25 +558,31 @@ export default function Home() {
                   {stage === "approved"
                     ? "Complete"
                     : stage === "review"
-                    ? "Approval gate"
-                    : "Start run"}
+                    ? "Review required"
+                    : "Ready"}
                 </StatusChip>
               </div>
-
-              <StepRail stage={stage} />
 
               <div className="rounded-[1.75rem] border border-white/10 bg-black/20 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-black uppercase tracking-[0.24em] text-slate-500">
-                      Choose profile
+                      1 · Choose profile
                     </p>
                     <p className="mt-1 text-lg font-black text-white">
-                      MongoDB-backed scenario selector
+                      Select the business scenario.
                     </p>
                   </div>
-                  <StatusChip tone={selectedScenario.tone}>{selectedScenario.label}</StatusChip>
+                  <StatusChip tone={isRunLocked ? "green" : selectedScenario.tone}>
+                    {isRunLocked ? "Locked during run" : selectedScenario.label}
+                  </StatusChip>
                 </div>
+
+                <p className="mt-2 text-xs font-bold leading-5 text-slate-400">
+                  {isRunLocked
+                    ? "Reset the run to choose a different profile."
+                    : "The profile locks as soon as Prepare starts."}
+                </p>
 
                 <div className="mt-4 grid gap-2 md:grid-cols-3">
                   {scenarioProfiles.map((profile) => {
@@ -590,28 +598,50 @@ export default function Home() {
                           setShowProof(false);
                           setError(null);
                         }}
-                        disabled={Boolean(plan)}
-                        className={`rounded-2xl border px-4 py-3 text-left transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                          isSelected
-                            ? "border-emerald-300/40 bg-emerald-300/10"
+                        disabled={isRunLocked}
+                        className={`rounded-2xl border px-4 py-3 text-left transition disabled:cursor-not-allowed ${
+                          isSelected && isRunLocked
+                            ? "border-emerald-300/50 bg-emerald-300/15"
+                            : isSelected
+                            ? "border-emerald-300/40 bg-emerald-300/10 hover:bg-emerald-300/15"
+                            : isRunLocked
+                            ? "border-white/10 bg-white/[0.025] opacity-35"
                             : "border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
                         }`}
                       >
-                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
-                          {profile.label}
-                        </p>
-                        <p className="mt-1 text-sm font-black text-white">
-                          {profile.name}
-                        </p>
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
+                              {profile.label}
+                            </p>
+                            <p className="mt-1 text-sm font-black text-white">
+                              {profile.name}
+                            </p>
+                          </div>
+
+                          {isSelected && isRunLocked ? (
+                            <span className="rounded-full bg-emerald-300 px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-slate-950">
+                              Active run
+                            </span>
+                          ) : isSelected ? (
+                            <span className="rounded-full bg-emerald-300 px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-slate-950">
+                              Selected
+                            </span>
+                          ) : isRunLocked ? (
+                            <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">
+                              Locked
+                            </span>
+                          ) : null}
+                        </div>
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              <div className="grid gap-3 rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-4 md:grid-cols-3">
+              <div className="grid gap-3 rounded-[1.5rem] border border-white/10 bg-white/[0.035] p-3 md:grid-cols-3">
                 <ProofMini
-                  label="Business"
+                  label="Selected"
                   value={business?.name ?? selectedScenario.name}
                   tone="green"
                 />
@@ -626,7 +656,26 @@ export default function Home() {
                 />
               </div>
 
-              <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+              <div className="rounded-[1.75rem] border border-white/10 bg-black/20 p-4">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.24em] text-slate-500">
+                      2 · Run agent
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-slate-300">
+                      Prepare generates the plan. Review checks it. Approve finalizes it.
+                    </p>
+                  </div>
+                  <StatusChip tone={plan ? "yellow" : "blue"}>
+                    {plan ? "Agent run active" : "Ready to start"}
+                  </StatusChip>
+                </div>
+
+                <div className="mb-4">
+                  <StepRail stage={stage} />
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-[1fr_1fr_1fr]">
                 <motion.button
                   whileHover={{ scale: plan || isGenerating ? 1 : 1.02 }}
                   whileTap={{ scale: plan || isGenerating ? 1 : 0.98 }}
@@ -637,8 +686,8 @@ export default function Home() {
                   {isGenerating
                     ? "Preparing..."
                     : plan
-                    ? "Prepared"
-                    : "Prepare plan"}
+                    ? "1 · Prepared"
+                    : "1 · Prepare"}
                 </motion.button>
 
                 <button
@@ -659,19 +708,27 @@ export default function Home() {
                   {isApproving
                     ? "Approving..."
                     : finalBrief
-                    ? "Approved"
-                    : "Approve brief"}
+                    ? "3 · Approved"
+                    : "3 · Approve"}
                 </motion.button>
+                </div>
               </div>
 
               <div className="rounded-[1.75rem] border border-white/10 bg-black/20 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-500">
-                      Current status
+                      3 · Current output
                     </p>
                     <p className="mt-2 text-2xl font-black text-white">
                       {topStatus}
+                    </p>
+                    <p className="mt-2 text-xs font-bold leading-5 text-slate-400">
+                      {stage === "start"
+                        ? "No run yet. Choose a profile, then click Prepare."
+                        : stage === "review"
+                        ? "Plan is ready. Click Review to inspect details, then Approve."
+                        : "Brief is approved. Reset to test another scenario."}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -693,9 +750,9 @@ export default function Home() {
                     <button
                       onClick={resetRun}
                       disabled={!plan && !finalBrief}
-                      className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-slate-300 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-30"
+                      className="rounded-full border border-white/15 bg-white/[0.06] px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-slate-200 transition hover:bg-white/[0.12] disabled:cursor-not-allowed disabled:opacity-30"
                     >
-                      Reset
+                      Reset run
                     </button>
                   </div>
                 </div>

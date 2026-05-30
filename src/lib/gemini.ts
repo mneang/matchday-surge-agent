@@ -32,86 +32,89 @@ function extractJson(text: string) {
 
 export function getFallbackMatchdayPlan(input: PlannerInput): MatchdayPlan {
   const { businessProfile, matchdayScenario } = input;
-  const type = businessProfile.businessType.toLowerCase();
+  const businessType = businessProfile.businessType.toLowerCase();
 
-  if (type.includes("parking")) {
+  if (businessType.includes("parking")) {
     return {
-      summary: `${businessProfile.name} should prepare for ${matchdayScenario.expectedPattern} by assigning clear lane roles, reducing payment confusion, protecting pedestrian movement, and staging visible signage before the arrival window.`,
+      summary: `${businessProfile.name} should prepare for ${matchdayScenario.expectedPattern} by assigning clear crew roles, separating entry and exit movement, improving payment signage, and protecting pedestrian crossing points.`,
       staffing: [
         `Schedule up to ${businessProfile.maxStaff} crew members during the ${matchdayScenario.recommendedPrepWindow} prep window.`,
-        "Assign dedicated roles for entry lane direction, QR/payment support, pedestrian crossing watch, and rideshare/pickup zone guidance.",
-        "Keep one floating crew member available to relieve bottlenecks or redirect vehicles during the peak arrival and exit windows.",
+        "Assign one crew member to entry lanes, one to payment support, one to pedestrian crossing visibility, and one floating lead for congestion points.",
+        "Brief the crew on lane assignments, safety language, and escalation rules before arrivals begin.",
       ],
       inventory: [
-        "Prioritize lane signs, QR payment signs, safety cones, reflective vests, and pickup zone markers.",
-        "Stage cones and signs before the arrival surge so drivers can understand the flow without asking staff.",
-        "Keep backup signage and spare reflective gear available for post-match congestion.",
+        "Prioritize lane signs, QR payment signs, cones, reflective vests, and pickup zone markers.",
+        "Place payment and direction signs before drivers reach the decision point.",
+        "Keep backup cones and markers ready for post-match pedestrian and rideshare congestion.",
       ],
       serviceFlow: [
-        "Separate prepaid, QR/payment, and assistance-needed lanes where space allows.",
-        "Place pedestrian crossing markers and staff at the highest-conflict walking points.",
-        "Create a clear rideshare/pickup handoff area away from entry lanes to reduce gridlock.",
+        "Separate entry, exit, rideshare, and pedestrian movement as early as possible.",
+        "Use visible staff positions to prevent drivers from stopping in crossing zones.",
+        "Create a simple post-match reset plan for exit lanes and rideshare pickup pressure.",
       ],
       customerMessages: {
         english:
-          "Matchday parking is open. Please follow lane signs, use QR payment where available, and watch for pedestrian crossing points.",
+          "Matchday parking is active. Please follow posted lane signs, prepare payment before entry, and watch for pedestrian crossing points.",
         spanish:
-          "El estacionamiento para el día de partido está abierto. Siga las señales de carril, use el pago por QR si está disponible y tenga cuidado en los cruces peatonales.",
+          "El estacionamiento de día de partido está activo. Siga las señales de carril, prepare el pago antes de entrar y tenga cuidado con los cruces peatonales.",
         french:
-          "Le stationnement du jour de match est ouvert. Suivez les panneaux de voie, utilisez le paiement QR si disponible et faites attention aux passages piétons.",
+          "Le stationnement de jour de match est en cours. Suivez les panneaux de voie, préparez le paiement avant l’entrée et surveillez les passages piétons.",
       },
       riskNotes: [
         "This plan is a readiness recommendation, not an exact traffic forecast.",
-        "Payment confusion, pedestrian crossings, and rideshare congestion may create bottlenecks.",
+        "Entry lane backups, payment confusion, and pedestrian crossings are the primary safety pressure points.",
         "Owner approval is required before using customer-facing messages.",
       ],
       ownerChecklist: [
-        "Confirm crew schedule and lane roles.",
-        "Stage cones, vests, lane signs, and QR/payment signs.",
-        "Mark pedestrian crossing and rideshare/pickup zones.",
-        "Brief crew on entry flow, payment support, and post-match exit pressure.",
-        "Approve customer-facing parking messages.",
+        "Confirm crew schedule and lane assignments.",
+        "Place QR payment and directional signs before entry points.",
+        "Set cones and pedestrian crossing markers.",
+        "Brief staff on safety and congestion procedures.",
+        "Approve customer-facing messages.",
       ],
       approvalRequired: true,
     };
   }
 
-  if (type.includes("convenience") || type.includes("market")) {
+  if (businessType.includes("market") || businessType.includes("convenience")) {
     return {
-      summary: `${businessProfile.name} should prepare for ${matchdayScenario.expectedPattern} by prioritizing cold drinks, fast checkout, aisle flow, and multilingual customer instructions.`,
+      summary: `${businessProfile.name} should prepare for ${matchdayScenario.expectedPattern} by prioritizing cold drinks, fast checkout flow, aisle control, and simple multilingual customer instructions.`,
       staffing: [
-        `Schedule up to ${businessProfile.maxStaff} staff during the ${matchdayScenario.recommendedPrepWindow} prep window.`,
-        "Assign one person to checkout, one to cooler/drink restock, and one to aisle flow or customer questions.",
-        "Keep a flexible staff member ready for post-match restock pressure.",
+        `Schedule ${Math.min(
+          businessProfile.maxStaff,
+          businessProfile.normalStaff + 2
+        )} staff during the ${matchdayScenario.recommendedPrepWindow} prep window.`,
+        "Assign one cashier lead, one cooler/restock lead, and one floor monitor for aisle crowding.",
+        "Keep one flexible staff member ready for post-match restock pressure.",
       ],
       inventory: [
         "Prioritize water, sports drinks, snacks, ice, and phone chargers.",
-        "Load coolers with the fastest-moving drinks before the pre-match rush.",
-        "Create a small post-match reserve for drinks and snacks.",
+        "Pre-stock coolers and keep backup drink inventory close to the front.",
+        "Create a small reserve for post-match demand instead of selling through all stock before kickoff.",
       ],
       serviceFlow: [
-        "Keep aisles clear and move high-demand items closer to checkout if possible.",
-        "Use a simple express checkout lane for drinks and snacks.",
-        "Post short multilingual signs for checkout, cold drinks, and sold-out alternatives.",
+        "Keep aisles clear and move high-demand drinks toward fast-access areas.",
+        "Use a simplified checkout flow with clear lines and payment instructions.",
+        "Post quick signs for water, snacks, chargers, checkout, and exit flow.",
       ],
       customerMessages: {
         english:
-          "Cold drinks, snacks, and essentials are ready for matchday. Please use the express line for quick checkout.",
+          "Matchday essentials are available today. Cold drinks, snacks, ice, and chargers are near the front for faster checkout.",
         spanish:
-          "Bebidas frías, snacks y artículos esenciales están listos para el día de partido. Use la fila rápida para pagar más pronto.",
+          "Productos esenciales para el día de partido disponibles hoy. Bebidas frías, snacks, hielo y cargadores están cerca de la entrada para pagar más rápido.",
         french:
-          "Boissons fraîches, snacks et essentiels sont prêts pour le jour de match. Utilisez la file express pour un passage rapide.",
+          "Les essentiels de jour de match sont disponibles aujourd’hui. Boissons fraîches, snacks, glace et chargeurs sont près de l’entrée pour un passage rapide en caisse.",
       },
       riskNotes: [
         "This plan is a readiness recommendation, not an exact crowd forecast.",
-        "Cooler space, checkout lines, and aisle crowding may limit service speed.",
+        "Cooler congestion, checkout lines, and aisle crowding are the primary pressure points.",
         "Owner approval is required before using customer-facing messages.",
       ],
       ownerChecklist: [
         "Confirm cashier and restock coverage.",
-        "Stock water, sports drinks, snacks, ice, and chargers.",
-        "Create an express checkout flow.",
-        "Post multilingual signs for cold drinks and quick checkout.",
+        "Stock coolers with priority drinks.",
+        "Move fast-selling items near checkout.",
+        "Print or post multilingual customer signs.",
         "Approve customer-facing messages.",
       ],
       approvalRequired: true,
@@ -119,21 +122,24 @@ export function getFallbackMatchdayPlan(input: PlannerInput): MatchdayPlan {
   }
 
   return {
-    summary: `${businessProfile.name} should prepare for ${matchdayScenario.expectedPattern} by increasing coverage, prioritizing fast-moving menu items, and simplifying service flow before kickoff.`,
+    summary: `${businessProfile.name} should prepare for ${matchdayScenario.expectedPattern} by increasing service coverage, prioritizing fast-moving items, and simplifying guest flow before kickoff.`,
     staffing: [
-      `Schedule up to ${businessProfile.maxStaff} staff during the ${matchdayScenario.recommendedPrepWindow} prep window.`,
-      "Assign clear roles for kitchen, register, pickup, drinks, and floor support.",
+      `Schedule ${Math.min(
+        businessProfile.maxStaff,
+        businessProfile.normalStaff + 3
+      )} staff during the ${matchdayScenario.recommendedPrepWindow} prep window.`,
+      "Assign clear roles for kitchen, register, pickup, floor support, and runner coverage.",
       "Keep one flexible staff member available for post-match takeout demand.",
     ],
     inventory: [
-      "Prioritize water, soft drinks, grab-and-go meals, rice bowls, and tacos.",
+      "Prioritize water, soft drinks, grab-and-go meals, tacos, rice bowls, and packaging.",
       "Pre-pack high-demand items before the pre-match surge window.",
-      "Hold back a small post-match reserve for late demand.",
+      "Hold back a small post-match reserve for late takeout demand.",
     ],
     serviceFlow: [
-      "Create a simple matchday menu with fewer customizations.",
+      "Create a simplified matchday menu with fewer customizations.",
       "Separate dine-in, pickup, and quick-order lines if space allows.",
-      "Post wait-time expectations clearly near the entrance.",
+      "Post wait-time and pickup expectations clearly near the entrance.",
     ],
     customerMessages: {
       english:

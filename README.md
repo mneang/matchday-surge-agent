@@ -39,23 +39,25 @@ The demo includes three MongoDB-backed business profiles so the same agent patte
 
 ---
 
+## Product screenshots
+
+**Command board:** choose a MongoDB-backed business profile, then prepare, review, and approve the matchday plan.
+
+<img width="1262" height="859" alt="01-command-board" src="https://github.com/user-attachments/assets/db49f678-4573-4a08-a558-2aaa667491fd" />
+
+**Review details:** the owner reviews next actions and customer messages before approval.
+
+<img width="805" height="661" alt="02-review-details" src="https://github.com/user-attachments/assets/94950715-1014-401e-af7d-3416e6d0f173" />
+
+**Approved output:** the plan becomes a staff-ready brief only after owner approval.
+
+<img width="715" height="336" alt="03-approved-output" src="https://github.com/user-attachments/assets/a14b1770-693d-4154-be69-6c5e5385e465" />
+
+---
+
 ## Agent workflow
 
-```mermaid
-flowchart TD
-    A[Choose business profile] --> B[Load MongoDB memory]
-    B --> C[Business profile]
-    B --> D[Matchday scenario]
-    B --> E[Readiness template]
-    C --> F[Gemini generates tailored plan]
-    D --> F
-    E --> F
-    F --> G[Owner reviews plan]
-    G --> H{Approve brief?}
-    H -->|Yes| I[Save approval event]
-    I --> J[Final staff-ready brief]
-    H -->|No| K[Reset or review again]
-```
+<img width="1536" height="444" alt="diagram1" src="https://github.com/user-attachments/assets/f69be78e-24be-450e-a889-e7b3de8409e3" />
 
 Once the agent run starts, the selected profile locks. The owner can reset the run to test another business scenario.
 
@@ -63,26 +65,7 @@ Once the agent run starts, the selected profile locks. The owner can reset the r
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    U[Business owner / judge] --> UI[Next.js app on Cloud Run]
-    UI --> API[Next.js API routes]
-
-    API --> M[(MongoDB Atlas)]
-    API --> G[Gemini on Google Cloud]
-
-    M --> BP[business_profiles]
-    M --> MS[matchday_scenarios]
-    M --> RT[readiness_templates]
-    M --> GP[generated_plans]
-    M --> AE[approval_events]
-
-    G --> PLAN[Structured matchday plan]
-    PLAN --> UI
-    UI --> APPROVAL[Owner approval]
-    APPROVAL --> AE
-    APPROVAL --> BRIEF[Approved brief]
-```
+<img width="1536" height="569" alt="diagram2" src="https://github.com/user-attachments/assets/3ba36148-0e6d-4f61-9ad8-dcf1acef5614" />
 
 ---
 

@@ -39,7 +39,7 @@ The demo includes three MongoDB-backed business profiles so the same agent patte
 
 ---
 
-## Product screenshots
+## Demo walkthrough
 
 **Command board:** choose a MongoDB-backed business profile, then prepare, review, and approve the matchday plan.
 
@@ -57,6 +57,8 @@ The demo includes three MongoDB-backed business profiles so the same agent patte
 
 ## Agent workflow
 
+The agent follows a controlled run pattern: load memory, generate a plan, require review, and save approval before the brief becomes final.
+
 <img width="1536" height="444" alt="diagram1" src="https://github.com/user-attachments/assets/f69be78e-24be-450e-a889-e7b3de8409e3" />
 
 Once the agent run starts, the selected profile locks. The owner can reset the run to test another business scenario.
@@ -64,6 +66,8 @@ Once the agent run starts, the selected profile locks. The owner can reset the r
 ---
 
 ## Architecture
+
+The app is deployed on Cloud Run, uses MongoDB Atlas as operational memory, and calls Gemini through Google Cloud to generate structured plans.
 
 <img width="1536" height="569" alt="diagram2" src="https://github.com/user-attachments/assets/3ba36148-0e6d-4f61-9ad8-dcf1acef5614" />
 
@@ -87,7 +91,7 @@ This lets the same workflow adapt across restaurants, markets, and parking opera
 
 ## Gemini usage
 
-Gemini generates a structured readiness plan from the selected MongoDB context.
+Gemini generates a structured readiness plan after the app retrieves the selected business profile, matchday scenario, and readiness template from MongoDB.
 
 Inputs include:
 
@@ -253,15 +257,5 @@ Runtime configuration uses:
 ## Legal and safety note
 
 This is an independent demo project. It does not use official tournament logos, protected marks, or sponsorship claims. It does not claim exact crowd, traffic, or attendance predictions. Customer-facing messages require owner approval before being treated as final.
-
----
-
-## Next steps
-
-Potential extensions:
-
-- Downloadable staff brief export
-- More local business profiles
-- Manager notes and shift handoff history
 - Business-type-specific inventory quantity suggestions
 - Run history view for past approved briefs

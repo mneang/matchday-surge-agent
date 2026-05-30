@@ -1,31 +1,36 @@
 import { Db, MongoClient } from "mongodb";
 
-const uri = process.env.MONGODB_URI;
 const dbName = process.env.MONGODB_DB || "matchday_surge";
-
-if (!uri) {
-  throw new Error("Missing MONGODB_URI environment variable");
-}
 
 const globalForMongo = globalThis as typeof globalThis & {
   _mongoClientPromise?: Promise<MongoClient>;
 };
 
-let clientPromise: Promise<MongoClient>;
+function getMongoUri() {
+  const uri = process.env.MONGODB_URI;
 
-if (process.env.NODE_ENV === "development") {
-  if (!globalForMongo._mongoClientPromise) {
-    const client = new MongoClient(uri);
-    globalForMongo._mongoClientPromise = client.connect();
+  if (!uri) {
+    throw new Error("Missing MONGODB_URI environment variable");
   }
 
-  clientPromise = globalForMongo._mongoClientPromise;
-} else {
-  const client = new MongoClient(uri);
-  clientPromise = client.connect();
+  return uri;
+}
+
+function getClientPromise(): Promise<MongoClient> {
+  if (process.env.NODE_ENV === "development") {
+    if (!globalForMongo._mongoClientPromise) {
+      const client = new MongoClient(getMongoUri());
+      globalForMongo._mongoClientPromise = client.connect();
+    }
+
+    return globalForMongo._mongoClientPromise;
+  }
+
+  const client = new MongoClient(getMongoUri());
+  return client.connect();
 }
 
 export async function getMongoDb(): Promise<Db> {
-  const client = await clientPromise;
+  const client = await getClientPromise();
   return client.db(dbName);
 }

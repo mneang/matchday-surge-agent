@@ -695,7 +695,7 @@ export default function Home() {
                   disabled={!plan}
                   className="rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-5 text-sm font-black uppercase tracking-[0.16em] text-slate-200 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-30"
                 >
-                  {showDetails ? "Hide full plan" : "Review plan"}
+                  {showDetails ? "Hide full plan" : "2 · Review plan"}
                 </button>
 
                 <motion.button

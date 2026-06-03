@@ -1,8 +1,8 @@
 # Matchday Surge Agent
 
-**Matchday Surge Agent** is a MongoDB-backed operations agent that helps local businesses prepare for major matchday demand before crowds arrive.
+**Matchday Surge Agent** is a MongoDB MCP-powered operations agent that helps local businesses prepare for major matchday demand before crowds arrive.
 
-The app loads a business profile, matchday scenario, and readiness template from MongoDB, uses Gemini to generate a tailored surge plan, and requires owner approval before producing a staff-ready brief.
+The app uses a MongoDB MCP tool server to load a business profile, matchday scenario, and readiness template from MongoDB, then uses Gemini on Google Cloud to generate a tailored surge plan. The owner must review and approve the plan before it becomes a staff-ready brief.
 
 **Live Demo:** https://matchday-surge-agent-54292544314.us-central1.run.app  
 **Repository:** https://github.com/mneang/matchday-surge-agent  
@@ -17,11 +17,12 @@ Local businesses near major matchday corridors can face sudden operational press
 
 Matchday Surge Agent turns that pressure into a simple owner workflow:
 
-1. **Choose a business profile** from MongoDB.
-2. **Prepare a tailored plan** with Gemini.
-3. **Review the plan** across staffing, stock, flow, and customer messages.
-4. **Approve the brief** before it is treated as final.
-5. **Reset and test another profile** when needed.
+1. **Choose a business profile** backed by MongoDB.
+2. **Load operational context** through the MongoDB MCP tool server.
+3. **Prepare a tailored plan** with Gemini on Google Cloud.
+4. **Review the plan** across staffing, stock/resources, flow, and customer messages.
+5. **Approve the brief** before it is treated as final.
+6. **Reset and test another profile** when needed.
 
 The agent does not auto-publish customer messages, claim exact crowd predictions, or imply official tournament affiliation. The owner stays in control.
 
@@ -57,7 +58,7 @@ The demo includes three MongoDB-backed business profiles so the same agent patte
 
 ## Agent workflow
 
-The agent follows a controlled run pattern: load memory, generate a plan, require review, and save approval before the brief becomes final.
+The agent follows a controlled run pattern: load operational memory through the MongoDB MCP tool server, generate a structured plan with Gemini, require owner review, and save an approval event before the brief becomes final.
 
 <img width="1536" height="444" alt="diagram1" src="https://github.com/user-attachments/assets/f69be78e-24be-450e-a889-e7b3de8409e3" />
 
@@ -67,7 +68,7 @@ Once the agent run starts, the selected profile locks. The owner can reset the r
 
 ## Architecture
 
-The app is deployed on Cloud Run, uses MongoDB Atlas as operational memory, and calls Gemini through Google Cloud to generate structured plans.
+The app is deployed on Cloud Run. The agent route uses a MongoDB MCP tool server to retrieve operational context from MongoDB Atlas, then calls Gemini on Google Cloud to generate a structured matchday plan.
 
 <img width="1536" height="569" alt="diagram2" src="https://github.com/user-attachments/assets/3ba36148-0e6d-4f61-9ad8-dcf1acef5614" />
 
@@ -75,7 +76,7 @@ The app is deployed on Cloud Run, uses MongoDB Atlas as operational memory, and 
 
 ## MongoDB usage
 
-MongoDB acts as the agent’s operational memory.
+MongoDB acts as the agent’s operational memory, and the MongoDB MCP tool server exposes that memory to the agent route as tool-based context.
 
 | Collection | Purpose |
 |---|---|
@@ -85,13 +86,26 @@ MongoDB acts as the agent’s operational memory.
 | `generated_plans` | Stores Gemini-generated plans pending owner approval |
 | `approval_events` | Stores the approval audit trail for final briefs |
 
-This lets the same workflow adapt across restaurants, markets, and parking operations without hardcoding a single demo path.
+This lets the same agent workflow adapt across restaurants, markets, and parking operations without hardcoding a single demo path. The selected profile controls which scenario and readiness template the MCP tool loads for Gemini.
+
+---
+
+## MCP tool usage
+
+The app includes a lightweight MongoDB MCP tool server for agent context retrieval.
+
+| MCP tool | Purpose |
+|---|---|
+| `list_matchday_profiles` | Lists available local business profiles stored in MongoDB |
+| `load_matchday_context` | Loads the selected business profile, matchday scenario, and readiness template from MongoDB |
+
+The agent route calls `load_matchday_context` before Gemini generates the plan. The response includes the selected business context, scenario pressure, planning template, and guardrails.
 
 ---
 
 ## Gemini usage
 
-Gemini generates a structured readiness plan after the app retrieves the selected business profile, matchday scenario, and readiness template from MongoDB.
+Gemini generates a structured readiness plan after the agent retrieves the selected business profile, matchday scenario, and readiness template through the MongoDB MCP tool server.
 
 Inputs include:
 
@@ -138,6 +152,7 @@ Approval creates an event in MongoDB and unlocks the final staff-ready brief.
 
 - **Frontend:** Next.js, React, TypeScript, Tailwind CSS
 - **Backend:** Next.js API routes
+- **Agent tooling:** MongoDB MCP tool server
 - **Database:** MongoDB Atlas
 - **AI:** Gemini on Google Cloud
 - **Hosting:** Google Cloud Run
@@ -152,7 +167,7 @@ Approval creates an event in MongoDB and unlocks the final staff-ready brief.
 |---|---|
 | `POST /api/seed` | Seeds MongoDB with demo profiles, scenarios, and readiness templates |
 | `GET /api/scenario?businessId=...` | Loads a selected business profile, scenario, and template |
-| `POST /api/agent/generate-plan` | Generates a Gemini-powered plan for the selected business |
+| `POST /api/agent/generate-plan` | Calls the MongoDB MCP tool server, loads selected context, and generates a Gemini-powered plan |
 | `POST /api/approval/finalize-plan` | Approves the selected pending plan and saves the approval event |
 
 ---
@@ -251,6 +266,19 @@ Runtime configuration uses:
 - `GOOGLE_CLOUD_LOCATION`
 - `GOOGLE_GENAI_USE_VERTEXAI`
 - `GEMINI_MODEL`
+
+The deployed agent route uses the MongoDB MCP tool server at runtime. The hosted API response exposes MCP proof fields such as:
+
+```json
+{
+  "database": "mongodb_mcp",
+  "mcp": {
+    "enabled": true,
+    "server": "matchday-surge-mongodb-mcp",
+    "tool": "load_matchday_context"
+  }
+}
+```
 
 ---
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getMongoDb } from "@/lib/mongodb";
+import { loadMatchdayContextViaMcp } from "@/lib/mcpContext";
 import {
   generateMatchdayPlanWithGemini,
   getFallbackMatchdayPlan,
@@ -18,6 +19,7 @@ function buildAgentRun(args: {
   readinessTemplate: ReadinessTemplate;
   matchdayPlan: MatchdayPlan;
   mode: "gemini_live" | "deterministic_fallback";
+  contextSource: "mongodb_mcp" | "mongodb_driver";
 }): AgentRun {
   const {
     businessProfile,
@@ -25,7 +27,13 @@ function buildAgentRun(args: {
     readinessTemplate,
     matchdayPlan,
     mode,
+    contextSource,
   } = args;
+
+  const contextTool =
+    contextSource === "mongodb_mcp"
+      ? "MongoDB MCP tool server"
+      : "MongoDB Node.js driver fallback";
 
   return {
     agentName: "Matchday Surge Agent",
@@ -33,26 +41,26 @@ function buildAgentRun(args: {
     goal:
       "Prepare a local business for a major tournament matchday surge without overstaffing, stockouts, or confusing customer communication.",
     plan: [
-      "Load the local business profile from MongoDB.",
-      "Load the matchday scenario from MongoDB.",
-      "Load the readiness template and guardrails from MongoDB.",
-      "Generate a matchday surge readiness plan.",
+      "Load the local business profile through the MongoDB MCP tool server.",
+      "Load the matchday scenario through the MongoDB MCP tool server.",
+      "Load the readiness template and guardrails through the MongoDB MCP tool server.",
+      "Generate a matchday surge readiness plan with Gemini.",
       "Require owner approval before the plan is treated as final.",
     ],
     toolsUsed: [
       {
         step: "Load business profile",
-        tool: "MongoDB business_profiles",
+        tool: `${contextTool}: business_profiles`,
         status: "success",
       },
       {
         step: "Load matchday scenario",
-        tool: "MongoDB matchday_scenarios",
+        tool: `${contextTool}: matchday_scenarios`,
         status: "success",
       },
       {
         step: "Load readiness template",
-        tool: "MongoDB readiness_templates",
+        tool: `${contextTool}: readiness_templates`,
         status: "success",
       },
       {
@@ -66,15 +74,15 @@ function buildAgentRun(args: {
     ],
     observations: [
       `${businessProfile.name} operates in the ${businessProfile.area}.`,
-      `The scenario expects a ${matchdayScenario.expectedPattern}.`,
+      `The scenario expects ${matchdayScenario.expectedPattern}.`,
       `Primary risk factors include ${matchdayScenario.riskFactors.join(", ")}.`,
       `The readiness template includes ${readinessTemplate.sections.join(", ")}.`,
     ],
     decision: {
       surgeRisk: "high",
-      likelyPressurePoint: "staffing, inventory, and queue flow",
+      likelyPressurePoint: "staffing, resources, service flow, and customer communication",
       decisionSummary:
-        "The business should prepare for a concentrated matchday surge by increasing coverage, simplifying service flow, prioritizing fast-moving inventory, and preparing multilingual customer messages.",
+        "The business should prepare for a concentrated matchday surge by using the selected operating profile, planning around known constraints, and approving customer-facing messages before use.",
       confidence: mode === "gemini_live" ? "high" : "medium-high",
       recommendedOwnerAction:
         "Review and approve the matchday surge plan before sharing customer-facing messages or briefing staff.",
@@ -94,6 +102,51 @@ function buildAgentRun(args: {
   };
 }
 
+async function loadContextWithDriverFallback(businessId: string) {
+  const db = await getMongoDb();
+
+  const businessProfile = (await db.collection("business_profiles").findOne(
+    { businessId },
+    { projection: { _id: 0 } }
+  )) as BusinessProfile | null;
+
+  if (!businessProfile) {
+    throw new Error(`Missing business profile: ${businessId}`);
+  }
+
+  const scenarioId =
+    typeof (businessProfile as BusinessProfile & { scenarioId?: string })
+      ?.scenarioId === "string"
+      ? (businessProfile as BusinessProfile & { scenarioId: string }).scenarioId
+      : "wc2026_restaurant_rush";
+
+  const templateId =
+    typeof (businessProfile as BusinessProfile & { templateId?: string })
+      ?.templateId === "string"
+      ? (businessProfile as BusinessProfile & { templateId: string }).templateId
+      : "restaurant_surge_template";
+
+  const matchdayScenario = (await db.collection("matchday_scenarios").findOne(
+    { scenarioId },
+    { projection: { _id: 0 } }
+  )) as MatchdayScenario | null;
+
+  const readinessTemplate = (await db.collection("readiness_templates").findOne(
+    { templateId },
+    { projection: { _id: 0 } }
+  )) as ReadinessTemplate | null;
+
+  if (!matchdayScenario || !readinessTemplate) {
+    throw new Error("Missing scenario or readiness template.");
+  }
+
+  return {
+    businessProfile,
+    matchdayScenario,
+    readinessTemplate,
+  };
+}
+
 export async function POST(request: Request) {
   const db = await getMongoDb();
 
@@ -108,40 +161,27 @@ export async function POST(request: Request) {
     // No JSON body provided. Use default demo profile.
   }
 
-  const businessProfile = (await db.collection("business_profiles").findOne(
-    { businessId: requestedBusinessId },
-    { projection: { _id: 0 } }
-  )) as BusinessProfile | null;
+  let contextSource: "mongodb_mcp" | "mongodb_driver" = "mongodb_mcp";
+  let businessProfile: BusinessProfile;
+  let matchdayScenario: MatchdayScenario;
+  let readinessTemplate: ReadinessTemplate;
 
-  const scenarioId =
-    typeof (businessProfile as BusinessProfile & { scenarioId?: string })?.scenarioId === "string"
-      ? (businessProfile as BusinessProfile & { scenarioId: string }).scenarioId
-      : "wc2026_restaurant_rush";
+  try {
+    const mcpContext = await loadMatchdayContextViaMcp(requestedBusinessId);
+    businessProfile = mcpContext.businessProfile;
+    matchdayScenario = mcpContext.matchdayScenario;
+    readinessTemplate = mcpContext.readinessTemplate;
+  } catch (error) {
+    contextSource = "mongodb_driver";
+    console.error("MongoDB MCP unavailable, used driver fallback:", error);
 
-  const templateId =
-    typeof (businessProfile as BusinessProfile & { templateId?: string })?.templateId === "string"
-      ? (businessProfile as BusinessProfile & { templateId: string }).templateId
-      : "restaurant_surge_template";
-
-  const matchdayScenario = (await db.collection("matchday_scenarios").findOne(
-    { scenarioId },
-    { projection: { _id: 0 } }
-  )) as MatchdayScenario | null;
-
-  const readinessTemplate = (await db.collection("readiness_templates").findOne(
-    { templateId },
-    { projection: { _id: 0 } }
-  )) as ReadinessTemplate | null;
-
-  if (!businessProfile || !matchdayScenario || !readinessTemplate) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error:
-          "Missing demo data. Run POST /api/seed before generating a plan.",
-      },
-      { status: 404 }
+    const fallbackContext = await loadContextWithDriverFallback(
+      requestedBusinessId
     );
+
+    businessProfile = fallbackContext.businessProfile;
+    matchdayScenario = fallbackContext.matchdayScenario;
+    readinessTemplate = fallbackContext.readinessTemplate;
   }
 
   const input = {
@@ -167,6 +207,7 @@ export async function POST(request: Request) {
     readinessTemplate,
     matchdayPlan,
     mode,
+    contextSource,
   });
 
   const generatedPlan = {
@@ -175,6 +216,7 @@ export async function POST(request: Request) {
     scenarioId: matchdayScenario.scenarioId,
     status: "pending_owner_approval",
     mode,
+    contextSource,
     matchdayPlan,
     agentRun,
     createdAt: new Date().toISOString(),
@@ -186,8 +228,13 @@ export async function POST(request: Request) {
     ok: true,
     mode,
     source: {
-      database: "mongodb",
+      database: contextSource,
       ai: mode === "gemini_live" ? "gemini" : "fallback",
+    },
+    mcp: {
+      enabled: contextSource === "mongodb_mcp",
+      server: "matchday-surge-mongodb-mcp",
+      tool: "load_matchday_context",
     },
     businessProfile,
     matchdayScenario,

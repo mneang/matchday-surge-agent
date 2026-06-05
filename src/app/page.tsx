@@ -974,10 +974,10 @@ export default function Home() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.3em] text-sky-300">
-                Proof
+                Agent proof
               </p>
               <h2 className="mt-2 text-2xl font-black">
-                MongoDB MCP memory → Gemini plan → owner approval.
+                MongoDB MCP → Gemini → approval event.
               </h2>
             </div>
             <button
@@ -989,20 +989,28 @@ export default function Home() {
           </div>
 
           <div className="mt-5 grid gap-3 md:grid-cols-4">
-            <ProofMini label="MongoDB MCP" value="load_matchday_context" tone="green" />
+            <ProofMini
+              label="MongoDB MCP"
+              value="load_matchday_context"
+              tone="green"
+            />
             <ProofMini
               label="Gemini"
-              value={planResult?.mode === "gemini_live" ? "Live planning" : "Ready"}
+              value={
+                planResult?.mode === "gemini_live"
+                  ? "Structured plan"
+                  : "Ready"
+              }
               tone="blue"
             />
-            <ProofMini label="Guardrails" value="No auto-publish / no exact crowd claims" />
+            <ProofMini label="Guardrails" value="No auto-publish" />
             <ProofMini
               label="Owner"
               value={
                 finalBrief
-                  ? "Approval event saved"
+                  ? "Approval saved"
                   : plan
-                  ? "Owner approval needed"
+                  ? "Approval needed"
                   : "Waiting"
               }
               tone={finalBrief ? "green" : "yellow"}

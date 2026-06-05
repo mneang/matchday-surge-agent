@@ -977,7 +977,7 @@ export default function Home() {
                 Proof
               </p>
               <h2 className="mt-2 text-2xl font-black">
-                MongoDB memory → Gemini plan → owner approval.
+                MongoDB MCP memory → Gemini plan → owner approval.
               </h2>
             </div>
             <button
@@ -989,7 +989,7 @@ export default function Home() {
           </div>
 
           <div className="mt-5 grid gap-3 md:grid-cols-4">
-            <ProofMini label="MongoDB" value="Profile + scenario + template" tone="green" />
+            <ProofMini label="MongoDB MCP" value="load_matchday_context" tone="green" />
             <ProofMini
               label="Gemini"
               value={planResult?.mode === "gemini_live" ? "Live planning" : "Ready"}

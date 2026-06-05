@@ -513,8 +513,8 @@ export default function Home() {
           <div className="grid lg:grid-cols-[0.75fr_1.25fr]">
             <div className="relative flex min-h-[460px] flex-col justify-between bg-[radial-gradient(circle_at_top_left,#16a34a_0,#052e16_34%,#020617_78%)] p-6 md:p-8">
               <div className="flex flex-wrap gap-2">
-                <StatusChip tone="green">MongoDB</StatusChip>
-                <StatusChip tone="green">Gemini</StatusChip>
+                <StatusChip tone="green">MongoDB MCP</StatusChip>
+                <StatusChip tone="green">Gemini live</StatusChip>
                 <StatusChip tone="yellow">Owner approval</StatusChip>
               </div>
 
@@ -744,7 +744,7 @@ export default function Home() {
                       {stage === "start"
                         ? "Waiting to run"
                         : stage === "review"
-                        ? "Owner approval needed"
+                        ? "Approval needed"
                         : "Ready for staff"}
                     </StatusChip>
                     <button
@@ -984,7 +984,7 @@ export default function Home() {
               onClick={() => setShowProof((value) => !value)}
               className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-slate-300 transition hover:bg-white/[0.08]"
             >
-              {showProof ? "Hide proof" : "Show proof"}
+              {showProof ? "Hide agent trace" : "Show agent trace"}
             </button>
           </div>
 

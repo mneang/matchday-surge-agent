@@ -362,3 +362,9 @@ For a full hosted verification path, see [`docs/cloud-run-proof.md`](./docs/clou
 ## Legal and safety note
 
 This is an independent demo project. It does not use official tournament logos, protected marks, or sponsorship claims. It does not claim exact crowd, traffic, or attendance predictions. Customer-facing messages require owner approval before being treated as final.
+
+---
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
